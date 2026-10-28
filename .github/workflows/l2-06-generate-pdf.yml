@@ -1,0 +1,109 @@
+name: Generate L2-06 digital handwritten-style study PDF
+
+on:
+  push:
+    branches:
+      - l2-06-software-security-leonardo
+    paths:
+      - '.github/workflows/l2-06-generate-pdf.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install generator
+        run: pip install reportlab
+      - name: Create PDF
+        shell: bash
+        run: |
+          python - <<'PY'
+          from reportlab.pdfgen import canvas
+          from reportlab.lib.pagesizes import A4
+          from reportlab.pdfbase import pdfmetrics
+          from reportlab.pdfbase.ttfonts import TTFont
+          from reportlab.lib.colors import HexColor
+          import os, urllib.request
+
+          OUTPUT = "readings/06-security/leonardo-freitas.pdf"
+          os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
+          FONT = "Handwriting"
+          local = "/tmp/caveat.ttf"
+          url = "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat%5Bwght%5D.ttf"
+          try:
+              urllib.request.urlretrieve(url, local)
+              pdfmetrics.registerFont(TTFont(FONT, local))
+              print("Loaded handwriting-style Caveat font")
+          except Exception as exc:
+              print("Caveat unavailable, using local italic fallback:", exc)
+              local = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf"
+              pdfmetrics.registerFont(TTFont(FONT, local))
+
+          paras = [
+            "A segurança de software é o conjunto de práticas para desenvolver e manter sistemas protegidos contra ataques, acessos indevidos e vulnerabilidades. Seu objetivo é preservar três princípios fundamentais: confidencialidade, integridade e disponibilidade. A confidencialidade limita o acesso a quem tem autorização; a integridade evita alterações indevidas; e a disponibilidade mantém serviços e dados acessíveis quando necessários.",
+            "Esse assunto é importante porque dependemos de programas em bancos, hospitais, empresas, transportes e outras atividades essenciais. Falhas podem provocar vazamentos de informações, perda financeira, interrupção de serviços e redução da confiança das pessoas. Quanto mais conectado um sistema, maiores podem ser os impactos de uma vulnerabilidade.",
+            "O ponto central da leitura é que a proteção precisa começar no planejamento e continuar por todo o ciclo de desenvolvimento. Isso inclui levantamento de requisitos, modelagem de ameaças, arquitetura segura, programação com boas práticas, revisão de código, testes, implantação e monitoramento. Corrigir um problema no início costuma ser mais eficaz do que tentar acrescentar segurança apenas depois.",
+            "Ferramentas automatizadas ajudam a localizar vulnerabilidades por análise do código e testes da aplicação, mas não substituem a avaliação de profissionais. A segurança depende também de conscientização, treinamento, gestão de riscos, acompanhamento de falhas e cooperação entre desenvolvedores, equipes de segurança e gestores.",
+            "Concluo que um software seguro não é aquele que nunca pode ser atacado, e sim o que reduz riscos e consegue prevenir, detectar e responder a problemas. A segurança deve ser uma responsabilidade contínua de toda a equipe para proteger dados, manter a confiabilidade e oferecer serviços mais resilientes."
+          ]
+
+          c = canvas.Canvas(OUTPUT, pagesize=A4, pageCompression=1)
+          c.setTitle("L2-06 - Seguranca de Software - Leonardo Freitas - Simulacao digital")
+          c.setAuthor("Leonardo Freitas - rascunho digital")
+          W, H = A4
+          c.setFillColor(HexColor("#FEFDF9")); c.rect(0,0,W,H,fill=1,stroke=0)
+          c.setStrokeColor(HexColor("#DDE3EE")); c.setLineWidth(.45)
+          for yy in range(95,int(H-70),25):
+              c.line(44, yy, W-44, yy)
+          blue = HexColor("#233F88")
+          c.setFillColor(blue)
+          c.setFont(FONT, 22)
+          c.drawString(59,H-73,"L2-06 - Seguranca de Software")
+          c.line(59,H-81,366,H-81)
+          c.setFont(FONT,15.1)
+          c.drawString(59,H-111,"Aluno: Leonardo Freitas")
+          y=H-151
+          max_width=W-112
+          fontsize=15.1
+          leading=20.0
+          c.setFillColor(blue)
+          for para in paras:
+              words=para.split()
+              lines=[]
+              cur=""
+              for word in words:
+                  candidate=(cur+" "+word).strip()
+                  if pdfmetrics.stringWidth(candidate,FONT,fontsize)<max_width:
+                      cur=candidate
+                  else:
+                      if cur: lines.append(cur)
+                      cur=word
+              if cur: lines.append(cur)
+              for line in lines:
+                  if y<95:
+                      raise ValueError(f"Text exceeds one A4 page at {line!r}; y={y}")
+                  c.setFont(FONT,fontsize)
+                  c.drawString(59,y,line)
+                  y-=leading
+              y-=13
+
+          c.setFillColor(HexColor("#737D90"))
+          c.setFont("Helvetica",7.6)
+          c.drawCentredString(W/2,52,"SIMULACAO DIGITAL DE ESCRITA A MAO - NAO E MANUSCRITO REAL")
+          c.drawCentredString(W/2,40,"Referencia publica de mesmo titulo: IEEE Computer Society / computer.org/resources/software-security")
+          c.save()
+          print(f"PDF saved: {OUTPUT} with final text y={y:.1f}")
+          PY
+      - name: Commit PDF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add readings/06-security/leonardo-freitas.pdf
+          git commit -m "L2-06: add digitally simulated handwritten-style summary PDF"
+          git push
